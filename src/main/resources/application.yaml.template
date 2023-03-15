@@ -1,0 +1,8 @@
+jira:
+  url:
+  username:
+  token:
+harvest:
+  url:
+  account-id:
+  token:
