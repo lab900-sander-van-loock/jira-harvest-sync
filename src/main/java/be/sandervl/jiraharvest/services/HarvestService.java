@@ -12,10 +12,11 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-//@Service
+@Service
 public class HarvestService {
 
     private final RestTemplate restClient;
@@ -28,10 +29,19 @@ public class HarvestService {
                 .build();
     }
 
+    public Iterable<TimeEntry> getTimeEntries() {
+        MultiValueMap<String, String> headers = new HttpHeaders();
+        HttpEntity<Object> requestEntity = new HttpEntity<>(headers);
+        LocalDate from = LocalDate.now().minusDays(30);
+        LocalDate to = LocalDate.now();
+        return restClient.exchange("/api/v2/time_entries?from=" + from.format(DateTimeFormatter.ISO_DATE) + "&to=" + to.format(DateTimeFormatter.ISO_DATE), HttpMethod.GET, requestEntity, new ParameterizedTypeReference<HarvestResponseTimeEntries<TimeEntry>>() {
+        }).getBody().getTimeEntries();
+    }
+
     public Iterable<ProjectAssignment> getProjectAssignments() {
         MultiValueMap<String, String> headers = new HttpHeaders();
         HttpEntity<Object> requestEntity = new HttpEntity<>(headers);
-        return restClient.exchange("/api/v2/users/me/project_assignments", HttpMethod.GET, requestEntity, new ParameterizedTypeReference<HarvestResponse<ProjectAssignment>>() {
+        return restClient.exchange("/api/v2/users/me/project_assignments", HttpMethod.GET, requestEntity, new ParameterizedTypeReference<HarvestResponseProjectAssignments<ProjectAssignment>>() {
         }).getBody().projectAssignments;
     }
 
@@ -54,7 +64,8 @@ public class HarvestService {
                                   @JsonProperty("spent_date") String spentDate, String notes) {
     }
 
-    public record TimeEntry(Project project, Client client, Task task, String notes) {
+    public record TimeEntry(double hours, @JsonProperty("created_at") LocalDateTime createdAt, Project project,
+                            Client client, Task task, String notes, TaskAssignment taskAssignment) {
     }
 
     public record ProjectAssignment(Project project, Client client,
@@ -73,12 +84,12 @@ public class HarvestService {
     public record TaskAssignment(Task task) {
     }
 
-    public static class HarvestResponse<T> {
+    public static class HarvestResponseProjectAssignments<T> {
 
         @JsonProperty("project_assignments")
         private List<T> projectAssignments;
 
-        public HarvestResponse() {
+        public HarvestResponseProjectAssignments() {
         }
 
         public List<T> getProjectAssignments() {
@@ -87,6 +98,23 @@ public class HarvestService {
 
         public void setProjectAssignments(List<T> projectAssignments) {
             this.projectAssignments = projectAssignments;
+        }
+    }
+
+    public static class HarvestResponseTimeEntries<T> {
+
+        @JsonProperty("time_entries")
+        private List<T> timeEntries;
+
+        public HarvestResponseTimeEntries() {
+        }
+
+        public List<T> getTimeEntries() {
+            return timeEntries;
+        }
+
+        public void setTimeEntries(List<T> timeEntries) {
+            this.timeEntries = timeEntries;
         }
     }
 }
