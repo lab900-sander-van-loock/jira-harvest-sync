@@ -1,5 +1,6 @@
 package be.sandervl.jiraharvest.commands;
 
+import be.sandervl.jiraharvest.services.JiraIssueParser;
 import be.sandervl.jiraharvest.services.JiraService;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
@@ -14,9 +15,11 @@ public class ListJiraIssues {
     protected final Logger LOG = Logger.getLogger(getClass().getName());
 
     private final JiraService jiraService;
+    private final JiraIssueParser issueParser;
 
-    public ListJiraIssues(JiraService jiraService) {
+    public ListJiraIssues(JiraService jiraService, JiraIssueParser issueParser) {
         this.jiraService = jiraService;
+        this.issueParser = issueParser;
     }
 
     @ShellMethod(value = "List Jira issues", key = "lsj")
@@ -32,6 +35,6 @@ public class ListJiraIssues {
                         %s: %s
                         %s
                         Estimated time: %s
-                        """, issue.key(), issue.fields().summary(), String.join(",", issue.fields().labels()), jiraService.getWorkedTimeForIssue(issue).map(d -> d.toHours() + "h").orElse("N/A"));
+                        """, issue.key(), issue.fields().summary(), String.join(",", issue.fields().labels()), issueParser.getWorkedTimeForIssue(issue).map(d -> d.toHours() + "h").orElse("N/A"));
     }
 }

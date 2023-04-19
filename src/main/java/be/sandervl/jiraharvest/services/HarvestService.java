@@ -81,7 +81,7 @@ public class HarvestService {
     public record Client(Long id, String name) {
     }
 
-    public record TaskAssignment(Task task) {
+    public record TaskAssignment(Task task, boolean billable) {
     }
 
     public static class HarvestResponseProjectAssignments<T> {

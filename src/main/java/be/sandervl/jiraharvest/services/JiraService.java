@@ -11,12 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,33 +26,7 @@ public class JiraService {
                 .build();
     }
 
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
-
-    public Optional<Duration> getWorkedTimeForIssue(BasicIssue issue) {
-        var statusChange = issue.changelog.histories.stream()
-                .flatMap(history -> history.items.stream()
-                        .filter(item -> item.fieldId() != null
-                                && item.fromString() != null
-                                && item.toStringJava() != null
-                                && item.fieldId().equalsIgnoreCase("status")
-                        )
-                        .map(item -> new StatusChange(item.fromString(), item.toStringJava(), LocalDateTime.parse(history.created, formatter)))
-                ).toList();
-
-        Optional<LocalDateTime> startingTime = statusChange.stream()
-                .filter(sc -> sc.time != null && sc.from().equalsIgnoreCase("To Do"))
-                .min(Comparator.comparing(StatusChange::time))
-                .map(StatusChange::time);
-        Optional<LocalDateTime> endingTime = statusChange.stream()
-                .filter(sc -> sc.time != null && sc.from().equalsIgnoreCase("In Progress"))
-                .max(Comparator.comparing(StatusChange::time))
-                .map(StatusChange::time);
-        return startingTime.flatMap(st -> endingTime.map(et -> Duration.between(st,et)));
-    }
-
-    public record StatusChange(String from, String to, LocalDateTime time) {
-    }
 
     public Iterable<BasicIssue> getIssues() {
         MultiValueMap<String, String> headers = new HttpHeaders();
