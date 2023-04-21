@@ -6,6 +6,7 @@ import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.shell.boot.TerminalCustomizer;
 import org.springframework.shell.jline.PromptProvider;
 
 @SpringBootApplication
@@ -15,6 +16,11 @@ public class JiraHarvestApplication {
         SpringApplication application = new SpringApplication(JiraHarvestApplication.class);
         application.setBannerMode(Banner.Mode.OFF);
         application.run(args);
+    }
+
+    @Bean
+    public TerminalCustomizer terminalCustomizer() {
+        return terminalBuilder -> terminalBuilder.system(true);
     }
 
     @Bean

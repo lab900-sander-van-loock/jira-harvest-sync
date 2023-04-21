@@ -5,6 +5,7 @@ import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -31,7 +32,7 @@ public class ListHarvestProjects {
     @ShellMethod(value = "List Harvest time entries", key = "lsht")
     public String listHarvestTimeEntries() {
         return StreamSupport.stream(harvestService.getTimeEntries().spliterator(), false)
-                .map(this::formatTimeEntry)
+                .map(ListHarvestProjects::formatTimeEntry)
                 .collect(Collectors.joining("\n"));
     }
 
@@ -44,7 +45,7 @@ public class ListHarvestProjects {
                         """, projectAssignment.client().name(), projectAssignment.project().name(), taskAssignment.task().name());
     }
 
-    private String formatTimeEntry(HarvestService.TimeEntry entry) {
+    public static String formatTimeEntry(HarvestService.TimeEntry entry) {
         return
                 String.format("""
                                 Project: %s
@@ -53,6 +54,7 @@ public class ListHarvestProjects {
                                 Task Assignment: %s
                                 Hours: %s
                                 Created At: %s
+                                
                                 """,
                         entry.project().name(),
                         entry.task().name(),

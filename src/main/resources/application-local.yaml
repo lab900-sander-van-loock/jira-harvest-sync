@@ -1,0 +1,12 @@
+spring:
+  main:
+    banner-mode: off
+
+jira:
+  url: https://lab900.atlassian.net
+  username: sander.vanloock@lab900.com
+  token: ATATT3xFfGF0srvo5C-i3-tBDYnvVgDBerHu4p7Qob8LUGlYZIpKs6-Ot4p_sIaRL5Xnul3oHMKU3eZBNHdoJP2cgmwLgwKl4NBlxgSBmQm_XbP5njBSlQOcl-R-4dXgqGH6ypevPTzsKAhp3c7bsB4A61eovVjtu4tXJBtD4vv14tgbaMCfJ-U=540008D3
+harvest:
+  url: https://api.harvestapp.com
+  account-id: 1460550
+  token: 2893718.pt.Ul6SECK86CxjeG_USBRkRIhqqIsNP4MXrkbnrF8i35Cn9_gUFjRjlmEeCU1J2ptLYUWzE63o91iZvYDyFEAypw

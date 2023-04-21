@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,14 +20,15 @@ import java.util.stream.Collectors;
 public class JiraService {
 
     private final RestTemplate restClient;
+    private final JiraIssueParser jiraIssueParser;
 
-    public JiraService(Environment environment) {
+    public JiraService(Environment environment, JiraIssueParser jiraIssueParser) {
         restClient = new RestTemplateBuilder()
                 .rootUri(environment.getProperty("jira.url"))
                 .basicAuthentication(environment.getProperty("jira.username"), environment.getProperty("jira.token"))
                 .build();
+        this.jiraIssueParser = jiraIssueParser;
     }
-
 
 
     public Iterable<BasicIssue> getIssues() {
@@ -37,20 +40,14 @@ public class JiraService {
         if (currentUser == null) {
             throw new RuntimeException("Could not get current user");
         }
-        List<BasicIssue> issues = restClient.exchange("/rest/api/2/search?expand=changelog&jql=labels in (HARVEST-Billable, HARVEST-NON-Billable) AND updated >= -1w AND statusCategory in (4, 3) ORDER BY updated DESC", HttpMethod.GET, requestEntity, new ParameterizedTypeReference<JiraPage<BasicIssue>>() {
+        List<BasicIssue> issues = restClient.exchange("/rest/api/2/search?expand=changelog&jql=labels in (HARVEST-Billable, HARVEST-NON-Billable) AND updated > -7d AND statusCategory in (4, 3) ORDER BY updated DESC", HttpMethod.GET, requestEntity, new ParameterizedTypeReference<JiraPage<BasicIssue>>() {
                 }).getBody()
                 .getIssues()
                 .stream()
-                .filter(issue -> isCurrentAssigneeOrWasAssigneeInChangelog(currentUser, issue))
+                .filter(issue -> JiraIssueParser.isCurrentAssigneeOrWasAssigneeInChangelog(currentUser, issue) &&
+                        jiraIssueParser.getWorkedOnTimeForIssue(issue).map(d -> Duration.between(d.atStartOfDay(), LocalDateTime.now()).toDays() < 7).orElse(false))
                 .collect(Collectors.toList());
         return issues;
-    }
-
-    private static boolean isCurrentAssigneeOrWasAssigneeInChangelog(JiraUser currentUser, BasicIssue issue) {
-        return (issue.fields.assignee() != null && issue.fields().assignee().accountId.equals(currentUser.accountId()))
-                || issue.changelog.histories.stream().anyMatch(history -> history.items.stream().anyMatch(item -> {
-            return item.fieldId() != null && item.fromString() != null && item.fieldId().equalsIgnoreCase("assignee") && item.from().equals(currentUser.accountId());
-        }));
     }
 
     public record JiraUser(String accountId, String emailAddress, String displayName, String active, String timeZone) {

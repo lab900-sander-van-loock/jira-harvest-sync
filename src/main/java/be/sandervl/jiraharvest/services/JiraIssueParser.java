@@ -15,6 +15,13 @@ public class JiraIssueParser {
 
     public record StatusChange(String from, String to, LocalDateTime time) {
     }
+
+    public static boolean isCurrentAssigneeOrWasAssigneeInChangelog(JiraService.JiraUser currentUser, JiraService.BasicIssue issue) {
+        boolean issueIsAssignedToUser = issue.fields().assignee() != null && issue.fields().assignee().accountId().equals(currentUser.accountId());
+        boolean userIsAssigneeInChangelog = issue.changelog().histories().stream().anyMatch(history -> history.items().stream().anyMatch(item -> item.fieldId() != null && item.fromString() != null && item.fieldId().equalsIgnoreCase("assignee") && item.from().equals(currentUser.accountId())));
+        return issueIsAssignedToUser || userIsAssigneeInChangelog;
+    }
+
     public Optional<LocalDate> getWorkedOnTimeForIssue(JiraService.BasicIssue issue) {
         var statusChange = issue.changelog().histories().stream()
                 .flatMap(history -> history.items().stream()
@@ -32,6 +39,7 @@ public class JiraIssueParser {
                 .map(StatusChange::time)
                 .map(LocalDateTime::toLocalDate);
     }
+
     public Optional<Duration> getWorkedTimeForIssue(JiraService.BasicIssue issue) {
         var statusChange = issue.changelog().histories().stream()
                 .flatMap(history -> history.items().stream()
@@ -51,7 +59,7 @@ public class JiraIssueParser {
                 .filter(sc -> sc.time != null && sc.from().equalsIgnoreCase("In Progress"))
                 .max(Comparator.comparing(StatusChange::time))
                 .map(StatusChange::time);
-        return startingTime.flatMap(st -> endingTime.map(et -> Duration.between(st,et)));
+        return startingTime.flatMap(st -> endingTime.map(et -> Duration.between(st, et)));
     }
 
 }
