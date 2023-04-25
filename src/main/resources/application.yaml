@@ -1,0 +1,6 @@
+spring:
+  main:
+    banner-mode: off
+
+sync:
+  daysToGoBack: 7
