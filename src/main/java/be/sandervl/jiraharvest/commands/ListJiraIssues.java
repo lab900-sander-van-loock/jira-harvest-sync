@@ -2,12 +2,11 @@ package be.sandervl.jiraharvest.commands;
 
 import be.sandervl.jiraharvest.services.JiraIssueParser;
 import be.sandervl.jiraharvest.services.JiraService;
-import org.springframework.shell.standard.ShellComponent;
-import org.springframework.shell.standard.ShellMethod;
-
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import org.springframework.shell.standard.ShellComponent;
+import org.springframework.shell.standard.ShellMethod;
 
 @ShellComponent
 public class ListJiraIssues {
@@ -24,9 +23,9 @@ public class ListJiraIssues {
 
     @ShellMethod(value = "List Jira issues", key = "lsj")
     public String listJiraIssues() {
-        return StreamSupport.stream(jiraService.getIssues().spliterator(), false)
-                .map(issue -> formatIssue(issue))
-                .collect(Collectors.joining("\n"));
+    return StreamSupport.stream(jiraService.getIssues().spliterator(), false)
+        .map(this::formatIssue)
+        .collect(Collectors.joining("\n"));
     }
 
     private String formatIssue(JiraService.BasicIssue issue) {

@@ -7,7 +7,10 @@ import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -62,15 +65,17 @@ public class JiraHarvestSync {
 
   private void process(JiraService.BasicIssue issue) {
     try {
+      String statement =
+          String.format("Processing Jira issue '%s - %s'\n", issue.key(), issue.fields().summary());
+      terminal.writer().print(statement);
+
       var taskAndProjectEntry =
           getTaskAndProjectFromIssue(issue).orElseGet(this::projectAndTaskCorrectionFlow);
 
-      var projectAssignment = taskAndProjectEntry._2();
-      var taskAssignment = taskAndProjectEntry._1();
+      var projectAssignment = taskAndProjectEntry._1();
+      var taskAssignment = taskAndProjectEntry._2();
       var spentDate =
-          issueParser
-              .getWorkedOnTimeForIssue(issue)
-              .orElseThrow(() -> new RuntimeException("No date found"));
+          issueParser.getWorkedOnTimeForIssue(issue).orElseGet(this::spentDateCorrectionFlow);
       Double hours =
           Math.max(
               1,
@@ -78,8 +83,7 @@ public class JiraHarvestSync {
                   .getWorkedTimeForIssue(issue)
                   .map(Duration::toHours)
                   .map(Double::valueOf)
-                  .orElseThrow(
-                      () -> new RuntimeException("No time found for issue " + issue.key())));
+                  .orElseGet(this::spentHoursCorrectionFlow));
       String notes = issue.key();
 
       confirmationFlow(
@@ -100,12 +104,10 @@ public class JiraHarvestSync {
                     Failure reason: %s
                                         """,
                   issue.key(), issue.fields().summary(), e.getMessage()));
-
-      // TODO go into correctionFlow
     }
   }
 
-  private Optional<Tuple2<HarvestService.TaskAssignment, HarvestService.ProjectAssignment>>
+  private Optional<Tuple2<HarvestService.ProjectAssignment, HarvestService.TaskAssignment>>
       getTaskAndProjectFromIssue(JiraService.BasicIssue issue) {
     var projectAssignmentsForClient =
         projectAssignments.stream()
@@ -125,7 +127,7 @@ public class JiraHarvestSync {
             ass ->
                 ass.taskAssignments().stream()
                     .sorted(matchingTaskComparator())
-                    .map(e -> Tuple.of(e, ass)))
+                    .map(e -> Tuple.of(ass, e)))
         .findFirst();
   }
 
@@ -140,6 +142,7 @@ public class JiraHarvestSync {
         String.format(
             """
                             This Jira issue '%s - %s' will be converted to a Harvest time entry.
+                            Client: %s
                             Project: %s
                             Task: %s
                             Spent Date: %s
@@ -148,6 +151,11 @@ public class JiraHarvestSync {
                             """,
             issue.key(),
             issue.fields().summary(),
+            this.projectAssignments.stream()
+                .filter(pa -> pa.project().id().equals(projectId))
+                .findFirst()
+                .map(pa -> pa.client().name())
+                .orElseThrow(),
             this.projectAssignments.stream()
                 .filter(pa -> pa.project().id().equals(projectId))
                 .findFirst()
@@ -169,15 +177,23 @@ public class JiraHarvestSync {
         componentFlowBuilder
             .clone()
             .reset()
-            .withConfirmationInput("isCorrect")
+            .withSingleItemSelector("isCorrect")
+            .selectItems(
+                Map.of(
+                    "Yes, send to Harvest",
+                    "true",
+                    "No, I will correct",
+                    "false",
+                    "No, skip this issue",
+                    "skip"))
             .name("Is this correct?")
             .and()
             .build();
     var results = flow.run();
 
-    Boolean isCorrect = results.getContext().get("isCorrect");
+    String isCorrect = results.getContext().get("isCorrect");
 
-    if (isCorrect != null && isCorrect) {
+    if (isCorrect != null && isCorrect.equals("true")) {
       var created = harvestService.create(projectId, taskId, spentDate, hours, notes);
       terminal
           .writer()
@@ -189,19 +205,21 @@ public class JiraHarvestSync {
                     """,
                   ListHarvestProjects.formatTimeEntry(created)));
     }
-    if (isCorrect != null && !isCorrect) {
-      //      correctionFlow(
-      //          issue,
-      //          projectAssignment,
-      //          taskAssignment,
-      //          spentDate,
-      //          hours,
-      //          notes,
-      //          projectAssignmentsForClient);
+    if (isCorrect != null && isCorrect.equals("false")) {
+      var projectAndTask = projectAndTaskCorrectionFlow();
+      spentDate = spentDateCorrectionFlow();
+      hours = spentHoursCorrectionFlow();
+      confirmationFlow(
+          issue,
+          projectAndTask._1().project().id(),
+          projectAndTask._2().task().id(),
+          spentDate,
+          hours,
+          notes);
     }
   }
 
-  private Tuple2<HarvestService.TaskAssignment, HarvestService.ProjectAssignment>
+  private Tuple2<HarvestService.ProjectAssignment, HarvestService.TaskAssignment>
       projectAndTaskCorrectionFlow() {
     ComponentFlow correctionFlow =
         componentFlowBuilder
@@ -253,14 +271,46 @@ public class JiraHarvestSync {
     return Tuple.of(
         this.projectAssignments.stream()
             .filter(e -> e.project().id().equals(projectId))
-            .flatMap(e -> e.taskAssignments().stream())
-            .filter(e -> e.task().id().equals(taskId))
             .findFirst()
             .orElseThrow(),
         this.projectAssignments.stream()
             .filter(e -> e.project().id().equals(projectId))
+            .flatMap(e -> e.taskAssignments().stream())
+            .filter(e -> e.task().id().equals(taskId))
             .findFirst()
             .orElseThrow());
+  }
+
+  private LocalDate spentDateCorrectionFlow() {
+    try {
+      ComponentFlow correctionFlow =
+          componentFlowBuilder
+              .clone()
+              .reset()
+              .withStringInput("spentDate")
+              .name("What day should this be logged?\n[dd/mm/yyyy]")
+              .and()
+              .build();
+      var correctionResults = correctionFlow.run();
+      return LocalDate.parse(
+          correctionResults.getContext().get("spentDate").toString(),
+          DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    } catch (DateTimeParseException pe) {
+      return spentDateCorrectionFlow();
+    }
+  }
+
+  private Double spentHoursCorrectionFlow() {
+    ComponentFlow correctionFlow =
+        componentFlowBuilder
+            .clone()
+            .reset()
+            .withStringInput("spentHours")
+            .name("How many hours did you work on this issue?\n")
+            .and()
+            .build();
+    var correctionResults = correctionFlow.run();
+    return Double.valueOf(correctionResults.getContext().get("spentHours").toString());
   }
 
   private static Comparator<HarvestService.TaskAssignment> matchingTaskComparator() {
