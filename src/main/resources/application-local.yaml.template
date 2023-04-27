@@ -1,8 +1,8 @@
 jira:
   url:
   username:
-  token:
+  token: see https://id.atlassian.com/manage-profile/security/api-tokens
 harvest:
   url:
   account-id:
-  token:
+  token: see https://id.getharvest.com/developers
