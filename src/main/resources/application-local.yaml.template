@@ -1,8 +1,8 @@
 jira:
-  url:
-  username:
-  token: see https://id.atlassian.com/manage-profile/security/api-tokens
+  url: (e.g. https://lab900.atlassian.net)
+  username: (your email on jira)
+  token: (see https://id.atlassian.com/manage-profile/security/api-tokens)
 harvest:
-  url:
-  account-id:
-  token: see https://id.getharvest.com/developers
+  url: (e.g. https://huapii.harvestapp.com)
+  account-id: (visible after generating the token)
+  token: (see https://id.getharvest.com/developers)
